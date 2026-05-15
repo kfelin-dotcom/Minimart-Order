@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="สั่งของ">
+<title>Green Minimart — สั่งของ</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f2f2f7;min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+
+.topbar{background:#fff;padding:14px 16px 12px;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:17px;font-weight:600;color:#1c1c1e}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.sync-dot{width:8px;height:8px;border-radius:4px;background:#c7c7cc}
+.sync-dot.ok{background:#34C759}
+.sync-dot.syncing{background:#FF9500}
+.sync-dot.err{background:#FF3B30}
+.edit-toggle{font-size:14px;color:#007AFF;background:none;border:none;padding:4px 0;cursor:pointer;font-weight:500}
+.edit-toggle.on{color:#FF9500}
+
+.shop-tabs{display:flex;gap:8px;padding:12px 16px;background:#f2f2f7}
+.shop-tab{flex:1;padding:10px;border:1.5px solid #c7c7cc;border-radius:10px;background:#fff;font-size:15px;font-weight:500;cursor:pointer;color:#8e8e93;text-align:center}
+.shop-tab.active{background:#007AFF;border-color:#007AFF;color:#fff}
+
+.cat-scroll{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;background:#f2f2f7;scrollbar-width:none}
+.cat-scroll::-webkit-scrollbar{display:none}
+.cat-tab{white-space:nowrap;padding:7px 16px;border:1.5px solid #c7c7cc;border-radius:20px;background:#fff;font-size:14px;cursor:pointer;color:#8e8e93;font-weight:500}
+.cat-tab.active{background:#34C759;border-color:#34C759;color:#fff}
+
+.cat-mgmt-panel{background:#f2f2f7;padding:8px 16px 12px}
+.cat-mgmt-label{font-size:12px;color:#8e8e93;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px}
+.cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cat-chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #c7c7cc;border-radius:16px;padding:5px 8px 5px 12px;font-size:13px;color:#1c1c1e}
+.del-cat-btn{width:18px;height:18px;border-radius:9px;background:#FF3B30;border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cat-add-row{display:flex;gap:8px}
+.cat-add-row input{flex:1;font-size:14px;padding:8px 12px;border:1px solid #c7c7cc;border-radius:10px;background:#fff;color:#1c1c1e}
+.cat-add-row button{padding:8px 14px;border:none;border-radius:10px;background:#FF9500;color:#fff;font-size:14px;font-weight:500;cursor:pointer}
+
+.add-item-panel{background:#f2f2f7;padding:8px 16px 12px}
+.add-row{display:flex;gap:8px}
+.add-row input{flex:1;font-size:15px;padding:9px 12px;border:1px solid #c7c7cc;border-radius:10px;background:#fff;color:#1c1c1e}
+.add-row button{padding:9px 14px;border:none;border-radius:10px;background:#007AFF;color:#fff;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap}
+
+.section{background:#fff;margin:0 0 12px;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+
+.item{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:0.5px solid #e5e5ea;background:#fff}
+.item:last-child{border-bottom:none}
+.item.checked{background:#f0fdf4}
+.chk{width:26px;height:26px;border-radius:13px;border:2px solid #c7c7cc;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:#fff;font-weight:700;cursor:pointer;margin-top:2px}
+.item.checked .chk{background:#34C759;border-color:#34C759}
+.item-body{flex:1;min-width:0;cursor:pointer}
+.item-name{font-size:15px;color:#1c1c1e;line-height:1.4}
+.item.checked .item-name{color:#15803d;font-weight:500}
+.qty-row{display:flex;align-items:center;gap:8px;margin-top:9px}
+.qty-label{font-size:12px;color:#8e8e93}
+.qty-stepper{display:flex;align-items:center;background:#f2f2f7;border-radius:10px;padding:3px}
+.qty-btn{width:32px;height:32px;border-radius:8px;border:none;background:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#007AFF;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.12)}
+.qty-num{min-width:38px;text-align:center;font-size:16px;font-weight:700;color:#1c1c1e}
+.del-btn{width:28px;height:28px;border-radius:14px;background:#FF3B30;border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:#8e8e93;font-size:15px;gap:8px}
+.spinner{width:20px;height:20px;border:2px solid #e5e5ea;border-top-color:#007AFF;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.bottombar{position:sticky;bottom:0;background:#fff;border-top:1px solid #e5e5ea;padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.summary-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.summary-count{font-size:14px;color:#8e8e93}
+.summary-count b{color:#1c1c1e;font-weight:600}
+.clear-btn{font-size:14px;color:#FF3B30;background:none;border:none;cursor:pointer;font-weight:500}
+.copy-btn{width:100%;padding:13px;background:#007AFF;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+.copy-btn.ok{background:#34C759}
+
+.empty{padding:28px;text-align:center;color:#8e8e93;font-size:15px}
+.main-content{padding-bottom:120px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">🛒 สั่งของ Green Minimart</div>
+  <div class="topbar-right">
+    <div class="sync-dot" id="syncDot" title="sync status"></div>
+    <button class="edit-toggle" id="editToggle">แก้ไข</button>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="shop-tabs" id="shopTabs"></div>
+  <div id="editCatPanel"></div>
+  <div class="cat-scroll" id="catTabs"></div>
+  <div id="editItemPanel"></div>
+  <div class="section">
+    <div id="itemList"><div class="loading"><div class="spinner"></div>กำลังโหลด...</div></div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <div class="summary-row">
+    <div class="summary-count">เลือกแล้ว <b id="countDisplay">0</b> รายการ</div>
+    <button class="clear-btn" id="clearBtn">ล้างทั้งหมด</button>
+  </div>
+  <button class="copy-btn" id="copyBtn">Copy รายการ → ส่ง Line</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  Firebase config
+// ═══════════════════════════════════════
+const FB_URL = 'https://minimart--order-default-rtdb.firebaseio.com';
+
+const DEFAULT_DATA = {
+  shops: ['Supercheap','รวยสุรา'],
+  catalog: {
+    'Supercheap': {
+      'เหล้า': ['Red lable 70 ml','Sminoff 20 ml','Red label 35 ml','Bacardi 180ml','Bacardi Rum 18cl White','Sminoff midnight เล็ก','Gilbev Gin 70ml','Sminoff ice apple','Sminoff ice','Caption morgan gold 330ml','Sminoff vodka 70ml','Sminoff vodka 1lt','Gilbev Vodka 1lt','Gilbev Vodka 70ml','Sminoff pink','Gilbev Gin 1lt','Caption morganatic white rum 75cl'],
+      'ขนม': ['อาริงาโต ตั้งเดิม','โฮมมี่ งา','ฟันโอ 5 บาท 25g','Tatawa Chocolate chips 120g','ไวโอเลต เลมอน 165g','โกปิโก้ ลูกอม ถุง 9 31.5 กาแฟ','ตูมตาม 91n ซุปไก่','โก้แก่ รสกระทิ 75g','โฟโมส จืด 225 มล','สิงบิน ปังปิ้ป 5 กก ไส้สัปรด','ยาสีฟัน คอลเกต เจล ฟลูออไรด์ 35g','TATAWA almond roast 120g','Tatawa blueberry 120g','คิทเคท 4F','คุกกี้ ช้อยส์ 50g ช็อกโกเลทชิพ','ยูโร้คัสตาด 144g','ถุง 9x18 ตรานกพิราบ','ถุง 12x20 ตราเครื่องบิน','ทวิสโก้ ข้าวโพด บาบีคิว 68g','บิสชิน มะพร้าว เวเฟอ 100g','ดิวเบอรี่ blueberry 105g','โฮมมี่มะพร้าว 120g','OREO 119.6g ต้นตำรับ','อาร์นอต good time ช็อคโก ดิป 71g','Soffel 70ml ชมพู','ปาปริก้า 20','โปเตโต้','PR ขนมข้าวเกรียบ มะเขือเทศ','ตอกลสลี่ ถุงคุกกี้ IPP พับข้าง 6x9 ใส','PR ขนมข้าวเกรียบ รสสาหร่าย','คุกกี้ ช้อยส์ 50g วนิลา','คุกกี้ ช้อยส์ 50g บัตเตอร์มิล'],
+      'ยา': []
+    },
+    'รวยสุรา': {
+      'เหล้า': ['แม่โขงแบน 350มล','แม่โขงกลม 70','ไฟเช็ค Taiyo 50pcs','Regency 70ml','Jack Daniel 37.5 ml','Old Passcas white 700มล','หงส์ทองกลม 1lt','Red Bull','แสมโสม กลม 70ml','แสงโสม กลม 1lt','Old Passcas dark rum 700ml','Meridiant แบน','Absolute vodka 200ml','แสงโสม แบน','หงส์ทองแบน','หงส์ทองกลม 70ml']
+    }
+  }
+};
+
+// ═══════════════════════════════════════
+//  State
+// ═══════════════════════════════════════
+let catalog = null;   // { shop: { cat: [items] } }
+let orders = {};      // { 'shop|cat|i': { checked, qty } }
+let currentShop = 'Supercheap';
+let currentCat = 'เหล้า';
+let editMode = false;
+let saveTimer = null;
+
+// ═══════════════════════════════════════
+//  Firebase helpers (REST API — no SDK needed)
+// ═══════════════════════════════════════
+function setSyncDot(state) {
+  const d = document.getElementById('syncDot');
+  d.className = 'sync-dot ' + state; // ok | syncing | err | ''
+}
+
+async function fbGet(path) {
+  const r = await fetch(FB_URL + path + '.json');
+  if (!r.ok) throw new Error('GET failed');
+  return r.json();
+}
+
+async function fbSet(path, data) {
+  const r = await fetch(FB_URL + path + '.json', {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error('SET failed');
+  return r.json();
+}
+
+async function fbPatch(path, data) {
+  const r = await fetch(FB_URL + path + '.json', {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error('PATCH failed');
+  return r.json();
+}
+
+// ═══════════════════════════════════════
+//  Load data from Firebase
+// ═══════════════════════════════════════
+async function loadFromFirebase() {
+  setSyncDot('syncing');
+  try {
+    let data = await fbGet('/catalog');
+    if (!data) {
+      // First time — push default catalog
+      await fbSet('/catalog', DEFAULT_DATA.catalog);
+      data = DEFAULT_DATA.catalog;
+    }
+    catalog = data;
+
+    let ord = await fbGet('/orders');
+    orders = ord || {};
+
+    setSyncDot('ok');
+    currentShop = DEFAULT_DATA.shops[0];
+    currentCat = Object.keys(catalog[currentShop])[0] || '';
+    render();
+  } catch(e) {
+    setSyncDot('err');
+    // Fallback to local
+    catalog = DEFAULT_DATA.catalog;
+    orders = {};
+    currentShop = DEFAULT_DATA.shops[0];
+    currentCat = Object.keys(catalog[currentShop])[0] || '';
+    render();
+    alert('ไม่สามารถเชื่อมต่อ Firebase ได้ — ใช้งานแบบ offline ชั่วคราว');
+  }
+}
+
+// ═══════════════════════════════════════
+//  Save catalog (debounced)
+// ═══════════════════════════════════════
+function saveCatalog() {
+  clearTimeout(saveTimer);
+  setSyncDot('syncing');
+  saveTimer = setTimeout(async () => {
+    try {
+      await fbSet('/catalog', catalog);
+      setSyncDot('ok');
+    } catch(e) { setSyncDot('err'); }
+  }, 800);
+}
+
+async function saveOrder(key, val) {
+  setSyncDot('syncing');
+  try {
+    await fbPatch('/orders', { [key]: val });
+    setSyncDot('ok');
+  } catch(e) { setSyncDot('err'); }
+}
+
+async function clearOrders(shopPrefix) {
+  setSyncDot('syncing');
+  try {
+    // Set all keys starting with shopPrefix to null (Firebase deletes null)
+    const patch = {};
+    Object.keys(orders).forEach(k => {
+      if (k.startsWith(shopPrefix)) patch[k] = null;
+    });
+    if (Object.keys(patch).length) await fbPatch('/orders', patch);
+    Object.keys(orders).forEach(k => { if (k.startsWith(shopPrefix)) delete orders[k]; });
+    setSyncDot('ok');
+  } catch(e) { setSyncDot('err'); }
+}
+
+// ═══════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════
+function getCats() { return Object.keys(catalog[currentShop] || {}); }
+function getItems() { return (catalog[currentShop] || {})[currentCat] || []; }
+function itemKey(shop, cat, i) { return shop + '||' + cat + '||' + i; }
+function curKey(i) { return itemKey(currentShop, currentCat, i); }
+
+function isChecked(i) { return !!(orders[curKey(i)] && orders[curKey(i)].c); }
+function getQty(i) { return (orders[curKey(i)] && orders[curKey(i)].q) || 1; }
+
+function countSelected() {
+  return Object.keys(orders).filter(k => k.startsWith(currentShop + '||') && orders[k] && orders[k].c).length;
+}
+
+// ═══════════════════════════════════════
+//  Actions
+// ═══════════════════════════════════════
+async function toggleItem(i) {
+  const k = curKey(i);
+  const cur = orders[k] || { c: false, q: 1 };
+  const next = { c: !cur.c, q: cur.q || 1 };
+  orders[k] = next;
+  await saveOrder(k, next);
+  render();
+}
+
+async function changeQty(i, delta) {
+  const k = curKey(i);
+  const cur = orders[k] || { c: true, q: 1 };
+  const next = { c: cur.c, q: Math.max(1, (cur.q || 1) + delta) };
+  orders[k] = next;
+  const el = document.getElementById('qty-num-' + i);
+  if (el) el.textContent = next.q;
+  document.getElementById('countDisplay').textContent = countSelected();
+  await saveOrder(k, next);
+}
+
+async function clearAll() {
+  if (!confirm('ล้างรายการที่เลือกทั้งหมดใน ' + currentShop + '?')) return;
+  await clearOrders(currentShop + '||');
+  render();
+}
+
+async function addItem() {
+  const inp = document.getElementById('newItem');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!catalog[currentShop][currentCat]) catalog[currentShop][currentCat] = [];
+  catalog[currentShop][currentCat].push(val);
+  inp.value = '';
+  saveCatalog();
+  render();
+}
+
+async function deleteItem(i) {
+  const items = getItems();
+  if (!confirm('ลบ "' + items[i] + '"?')) return;
+  catalog[currentShop][currentCat].splice(i, 1);
+  saveCatalog();
+  render();
+}
+
+async function addCat() {
+  const inp = document.getElementById('newCat');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!catalog[currentShop][val]) catalog[currentShop][val] = [];
+  inp.value = '';
+  currentCat = val;
+  saveCatalog();
+  render();
+}
+
+async function deleteCat(cat) {
+  if (!confirm('ลบหมวด "' + cat + '"?')) return;
+  delete catalog[currentShop][cat];
+  const cats = getCats();
+  currentCat = cats[0] || '';
+  saveCatalog();
+  render();
+}
+
+function copyOrder() {
+  const lines = ['สั่งของ ' + currentShop + '\n'];
+  const cats = Object.keys(catalog[currentShop] || {});
+  cats.forEach(cat => {
+    const items = catalog[currentShop][cat] || [];
+    const picked = [];
+    items.forEach((name, i) => {
+      const k = itemKey(currentShop, cat, i);
+      if (orders[k] && orders[k].c) {
+        picked.push('- ' + name + '  x' + (orders[k].q || 1));
+      }
+    });
+    if (picked.length) {
+      lines.push('[' + cat + ']');
+      picked.forEach(p => lines.push(p));
+      lines.push('');
+    }
+  });
+  const text = lines.join('\n').trim();
+  if (!text.includes('- ')) { alert('ยังไม่ได้เลือกรายการ'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showCopied).catch(() => fallbackCopy(text));
+  } else { fallbackCopy(text); }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); showCopied(); } catch(e) { alert(text); }
+  document.body.removeChild(ta);
+}
+
+function showCopied() {
+  const btn = document.getElementById('copyBtn');
+  btn.textContent = 'คัดลอกแล้ว! วางใน Line ได้เลย';
+  btn.className = 'copy-btn ok';
+  setTimeout(() => { btn.textContent = 'Copy รายการ → ส่ง Line'; btn.className = 'copy-btn'; }, 2500);
+}
+
+// ═══════════════════════════════════════
+//  Render
+// ═══════════════════════════════════════
+function render() {
+  if (!catalog) return;
+
+  // Shop tabs
+  const shopTabsEl = document.getElementById('shopTabs');
+  shopTabsEl.innerHTML = '';
+  DEFAULT_DATA.shops.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'shop-tab' + (s === currentShop ? ' active' : '');
+    btn.textContent = s;
+    btn.addEventListener('click', () => {
+      currentShop = s;
+      currentCat = Object.keys(catalog[s] || {})[0] || '';
+      render();
+    });
+    shopTabsEl.appendChild(btn);
+  });
+
+  const cats = getCats();
+  if (!cats.includes(currentCat)) currentCat = cats[0] || '';
+
+  // Edit cat panel
+  const editCatEl = document.getElementById('editCatPanel');
+  editCatEl.innerHTML = '';
+  if (editMode) {
+    const panel = document.createElement('div');
+    panel.className = 'cat-mgmt-panel';
+    const lbl = document.createElement('div');
+    lbl.className = 'cat-mgmt-label';
+    lbl.textContent = 'จัดการหมวด';
+    panel.appendChild(lbl);
+    const chips = document.createElement('div');
+    chips.className = 'cat-chips';
+    cats.forEach(c => {
+      const chip = document.createElement('span');
+      chip.className = 'cat-chip';
+      chip.appendChild(document.createTextNode(c));
+      const d = document.createElement('button');
+      d.className = 'del-cat-btn';
+      d.textContent = '×';
+      d.addEventListener('click', () => deleteCat(c));
+      chip.appendChild(d);
+      chips.appendChild(chip);
+    });
+    panel.appendChild(chips);
+    const addRow = document.createElement('div');
+    addRow.className = 'cat-add-row';
+    const inp = document.createElement('input');
+    inp.id = 'newCat';
+    inp.placeholder = 'ชื่อหมวดใหม่ เช่น เครื่องดื่ม';
+    const btn = document.createElement('button');
+    btn.textContent = '+ หมวด';
+    btn.addEventListener('click', addCat);
+    addRow.appendChild(inp); addRow.appendChild(btn);
+    panel.appendChild(addRow);
+    editCatEl.appendChild(panel);
+  }
+
+  // Cat tabs
+  const catTabsEl = document.getElementById('catTabs');
+  catTabsEl.innerHTML = '';
+  cats.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-tab' + (c === currentCat ? ' active' : '');
+    btn.textContent = c;
+    btn.addEventListener('click', () => { currentCat = c; render(); });
+    catTabsEl.appendChild(btn);
+  });
+
+  // Add item panel
+  const editItemEl = document.getElementById('editItemPanel');
+  editItemEl.innerHTML = '';
+  if (editMode) {
+    const panel = document.createElement('div');
+    panel.className = 'add-item-panel';
+    const addRow = document.createElement('div');
+    addRow.className = 'add-row';
+    const inp = document.createElement('input');
+    inp.id = 'newItem';
+    inp.placeholder = 'ชื่อสินค้า เช่น Regency 70ml';
+    const btn = document.createElement('button');
+    btn.textContent = '+ เพิ่ม';
+    btn.addEventListener('click', addItem);
+    addRow.appendChild(inp); addRow.appendChild(btn);
+    panel.appendChild(addRow);
+    editItemEl.appendChild(panel);
+  }
+
+  // Item list
+  const itemListEl = document.getElementById('itemList');
+  itemListEl.innerHTML = '';
+  const items = getItems();
+
+  if (!items.length) {
+    itemListEl.innerHTML = '<div class="empty">ยังไม่มีสินค้าในหมวดนี้<br>กด "แก้ไข" เพื่อเพิ่ม</div>';
+  } else {
+    items.forEach((item, i) => {
+      const on = isChecked(i);
+      const qty = getQty(i);
+      const row = document.createElement('div');
+      row.className = 'item' + (on ? ' checked' : '');
+
+      if (!editMode) {
+        const chk = document.createElement('div');
+        chk.className = 'chk';
+        chk.textContent = on ? '✓' : '';
+        chk.addEventListener('click', () => toggleItem(i));
+        row.appendChild(chk);
+
+        const body = document.createElement('div');
+        body.className = 'item-body';
+        body.addEventListener('click', () => toggleItem(i));
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'item-name';
+        nameEl.textContent = item;
+        body.appendChild(nameEl);
+
+        if (on) {
+          const qtyRow = document.createElement('div');
+          qtyRow.className = 'qty-row';
+          const lbl = document.createElement('span');
+          lbl.className = 'qty-label';
+          lbl.textContent = 'จำนวน:';
+          qtyRow.appendChild(lbl);
+          const stepper = document.createElement('div');
+          stepper.className = 'qty-stepper';
+          const minus = document.createElement('button');
+          minus.className = 'qty-btn';
+          minus.textContent = '−';
+          minus.addEventListener('click', e => { e.stopPropagation(); changeQty(i, -1); });
+          const num = document.createElement('div');
+          num.className = 'qty-num';
+          num.id = 'qty-num-' + i;
+          num.textContent = qty;
+          const plus = document.createElement('button');
+          plus.className = 'qty-btn';
+          plus.textContent = '+';
+          plus.addEventListener('click', e => { e.stopPropagation(); changeQty(i, 1); });
+          stepper.appendChild(minus); stepper.appendChild(num); stepper.appendChild(plus);
+          qtyRow.appendChild(stepper);
+          body.appendChild(qtyRow);
+        }
+        row.appendChild(body);
+      } else {
+        const nameEl = document.createElement('div');
+        nameEl.className = 'item-name';
+        nameEl.style.cssText = 'flex:1;padding-top:3px';
+        nameEl.textContent = item;
+        row.appendChild(nameEl);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'del-btn';
+        delBtn.textContent = '×';
+        delBtn.addEventListener('click', () => deleteItem(i));
+        row.appendChild(delBtn);
+      }
+      itemListEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('countDisplay').textContent = countSelected();
+}
+
+// ═══════════════════════════════════════
+//  Static listeners
+// ═══════════════════════════════════════
+document.getElementById('editToggle').addEventListener('click', () => {
+  editMode = !editMode;
+  const btn = document.getElementById('editToggle');
+  btn.textContent = editMode ? 'เสร็จแล้ว' : 'แก้ไข';
+  btn.className = 'edit-toggle' + (editMode ? ' on' : '');
+  render();
+});
+document.getElementById('clearBtn').addEventListener('click', clearAll);
+document.getElementById('copyBtn').addEventListener('click', copyOrder);
+
+// ═══════════════════════════════════════
+//  Boot
+// ═══════════════════════════════════════
+loadFromFirebase();
+</script>
+</body>
+</html>
