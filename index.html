@@ -14,7 +14,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar{background:#fff;padding:14px 16px 12px;border-bottom:1px solid #e5e5ea;position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between}
 .topbar-title{font-size:17px;font-weight:600;color:#1c1c1e}
 .topbar-right{display:flex;align-items:center;gap:12px}
-.sync-dot{width:8px;height:8px;border-radius:4px;background:#c7c7cc}
+.sync-dot{width:8px;height:8px;border-radius:4px;background:#c7c7cc;flex-shrink:0}
 .sync-dot.ok{background:#34C759}
 .sync-dot.syncing{background:#FF9500}
 .sync-dot.err{background:#FF3B30}
@@ -51,14 +51,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .item.checked{background:#f0fdf4}
 .chk{width:26px;height:26px;border-radius:13px;border:2px solid #c7c7cc;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:#fff;font-weight:700;cursor:pointer;margin-top:2px}
 .item.checked .chk{background:#34C759;border-color:#34C759}
-.item-body{flex:1;min-width:0;cursor:pointer}
-.item-name{font-size:15px;color:#1c1c1e;line-height:1.4}
+.item-body{flex:1;min-width:0}
+.item-name{font-size:15px;color:#1c1c1e;line-height:1.4;cursor:pointer}
 .item.checked .item-name{color:#15803d;font-weight:500}
-.qty-row{display:flex;align-items:center;gap:8px;margin-top:9px}
+
+/* Rename input — shown when editing name */
+.rename-input{font-size:15px;color:#1c1c1e;line-height:1.4;border:none;border-bottom:2px solid #007AFF;background:transparent;width:100%;padding:0 0 2px;outline:none}
+
+/* hint shown in normal mode */
+.rename-hint{font-size:11px;color:#c7c7cc;margin-top:2px}
+
+.qty-row{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
 .qty-label{font-size:12px;color:#8e8e93}
 .qty-stepper{display:flex;align-items:center;background:#f2f2f7;border-radius:10px;padding:3px}
 .qty-btn{width:32px;height:32px;border-radius:8px;border:none;background:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#007AFF;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.12)}
-.qty-num{min-width:38px;text-align:center;font-size:16px;font-weight:700;color:#1c1c1e}
+.qty-num{min-width:36px;text-align:center;font-size:16px;font-weight:700;color:#1c1c1e}
+.unit-select{font-size:14px;font-weight:600;color:#007AFF;background:#e8f0fe;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center}
+
 .del-btn{width:28px;height:28px;border-radius:14px;background:#FF3B30;border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
 
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:#8e8e93;font-size:15px;gap:8px}
@@ -72,7 +81,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .clear-btn{font-size:14px;color:#FF3B30;background:none;border:none;cursor:pointer;font-weight:500}
 .copy-btn{width:100%;padding:13px;background:#007AFF;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
 .copy-btn.ok{background:#34C759}
-
 .empty{padding:28px;text-align:center;color:#8e8e93;font-size:15px}
 .main-content{padding-bottom:120px}
 </style>
@@ -82,7 +90,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="topbar">
   <div class="topbar-title">🛒 สั่งของ Green Minimart</div>
   <div class="topbar-right">
-    <div class="sync-dot" id="syncDot" title="sync status"></div>
+    <div class="sync-dot" id="syncDot"></div>
     <button class="edit-toggle" id="editToggle">แก้ไข</button>
   </div>
 </div>
@@ -106,10 +114,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
-// ═══════════════════════════════════════
-//  Firebase config
-// ═══════════════════════════════════════
 const FB_URL = 'https://minimart--order-default-rtdb.firebaseio.com';
+const UNITS = ['ลัง','ขวด','แพ็ค','ชิ้น','ถาด','กล่อง','ห่อ','แผง','โหล','หมอน','กก','ปีบ'];
 
 const DEFAULT_DATA = {
   shops: ['Supercheap','รวยสุรา'],
@@ -125,141 +131,98 @@ const DEFAULT_DATA = {
   }
 };
 
-// ═══════════════════════════════════════
-//  State
-// ═══════════════════════════════════════
-let catalog = null;   // { shop: { cat: [items] } }
-let orders = {};      // { 'shop|cat|i': { checked, qty } }
+let catalog = null;
+let orders = {};
 let currentShop = 'Supercheap';
 let currentCat = 'เหล้า';
 let editMode = false;
+let renamingKey = null; // 'shop||cat||i' of item being renamed
 let saveTimer = null;
 
-// ═══════════════════════════════════════
-//  Firebase helpers (REST API — no SDK needed)
-// ═══════════════════════════════════════
-function setSyncDot(state) {
-  const d = document.getElementById('syncDot');
-  d.className = 'sync-dot ' + state; // ok | syncing | err | ''
-}
+// ─── Firebase ───────────────────────────────────
+function setSyncDot(s) { document.getElementById('syncDot').className = 'sync-dot ' + s; }
 
 async function fbGet(path) {
   const r = await fetch(FB_URL + path + '.json');
-  if (!r.ok) throw new Error('GET failed');
+  if (!r.ok) throw new Error('GET');
   return r.json();
 }
-
 async function fbSet(path, data) {
-  const r = await fetch(FB_URL + path + '.json', {
-    method: 'PUT',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  if (!r.ok) throw new Error('SET failed');
+  const r = await fetch(FB_URL + path + '.json', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+  if (!r.ok) throw new Error('SET');
   return r.json();
 }
-
 async function fbPatch(path, data) {
-  const r = await fetch(FB_URL + path + '.json', {
-    method: 'PATCH',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  if (!r.ok) throw new Error('PATCH failed');
+  const r = await fetch(FB_URL + path + '.json', { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+  if (!r.ok) throw new Error('PATCH');
   return r.json();
 }
 
-// ═══════════════════════════════════════
-//  Load data from Firebase
-// ═══════════════════════════════════════
 async function loadFromFirebase() {
   setSyncDot('syncing');
   try {
     let data = await fbGet('/catalog');
-    if (!data) {
-      // First time — push default catalog
-      await fbSet('/catalog', DEFAULT_DATA.catalog);
-      data = DEFAULT_DATA.catalog;
-    }
+    if (!data) { await fbSet('/catalog', DEFAULT_DATA.catalog); data = DEFAULT_DATA.catalog; }
     catalog = data;
-
     let ord = await fbGet('/orders');
     orders = ord || {};
-
     setSyncDot('ok');
     currentShop = DEFAULT_DATA.shops[0];
     currentCat = Object.keys(catalog[currentShop])[0] || '';
     render();
   } catch(e) {
     setSyncDot('err');
-    // Fallback to local
     catalog = DEFAULT_DATA.catalog;
     orders = {};
     currentShop = DEFAULT_DATA.shops[0];
     currentCat = Object.keys(catalog[currentShop])[0] || '';
     render();
-    alert('ไม่สามารถเชื่อมต่อ Firebase ได้ — ใช้งานแบบ offline ชั่วคราว');
   }
 }
 
-// ═══════════════════════════════════════
-//  Save catalog (debounced)
-// ═══════════════════════════════════════
 function saveCatalog() {
   clearTimeout(saveTimer);
   setSyncDot('syncing');
   saveTimer = setTimeout(async () => {
-    try {
-      await fbSet('/catalog', catalog);
-      setSyncDot('ok');
-    } catch(e) { setSyncDot('err'); }
+    try { await fbSet('/catalog', catalog); setSyncDot('ok'); }
+    catch(e) { setSyncDot('err'); }
   }, 800);
 }
 
 async function saveOrder(key, val) {
   setSyncDot('syncing');
-  try {
-    await fbPatch('/orders', { [key]: val });
-    setSyncDot('ok');
-  } catch(e) { setSyncDot('err'); }
+  try { await fbPatch('/orders', { [key]: val }); setSyncDot('ok'); }
+  catch(e) { setSyncDot('err'); }
 }
 
-async function clearOrders(shopPrefix) {
+async function clearOrders(prefix) {
   setSyncDot('syncing');
   try {
-    // Set all keys starting with shopPrefix to null (Firebase deletes null)
     const patch = {};
-    Object.keys(orders).forEach(k => {
-      if (k.startsWith(shopPrefix)) patch[k] = null;
-    });
+    Object.keys(orders).forEach(k => { if (k.startsWith(prefix)) patch[k] = null; });
     if (Object.keys(patch).length) await fbPatch('/orders', patch);
-    Object.keys(orders).forEach(k => { if (k.startsWith(shopPrefix)) delete orders[k]; });
+    Object.keys(orders).forEach(k => { if (k.startsWith(prefix)) delete orders[k]; });
     setSyncDot('ok');
   } catch(e) { setSyncDot('err'); }
 }
 
-// ═══════════════════════════════════════
-//  Helpers
-// ═══════════════════════════════════════
+// ─── Helpers ────────────────────────────────────
 function getCats() { return Object.keys(catalog[currentShop] || {}); }
 function getItems() { return (catalog[currentShop] || {})[currentCat] || []; }
 function itemKey(shop, cat, i) { return shop + '||' + cat + '||' + i; }
 function curKey(i) { return itemKey(currentShop, currentCat, i); }
-
-function isChecked(i) { return !!(orders[curKey(i)] && orders[curKey(i)].c); }
-function getQty(i) { return (orders[curKey(i)] && orders[curKey(i)].q) || 1; }
-
+function isChecked(i) { const o = orders[curKey(i)]; return !!(o && o.c); }
+function getQty(i) { const o = orders[curKey(i)]; return (o && o.q) || 1; }
+function getUnit(i) { const o = orders[curKey(i)]; return (o && o.u) || 'ลัง'; }
 function countSelected() {
   return Object.keys(orders).filter(k => k.startsWith(currentShop + '||') && orders[k] && orders[k].c).length;
 }
 
-// ═══════════════════════════════════════
-//  Actions
-// ═══════════════════════════════════════
+// ─── Actions ────────────────────────────────────
 async function toggleItem(i) {
   const k = curKey(i);
-  const cur = orders[k] || { c: false, q: 1 };
-  const next = { c: !cur.c, q: cur.q || 1 };
+  const cur = orders[k] || { c:false, q:1, u:'ลัง' };
+  const next = { c: !cur.c, q: cur.q||1, u: cur.u||'ลัง' };
   orders[k] = next;
   await saveOrder(k, next);
   render();
@@ -267,15 +230,45 @@ async function toggleItem(i) {
 
 async function changeQty(i, delta) {
   const k = curKey(i);
-  const cur = orders[k] || { c: true, q: 1 };
-  const next = { c: cur.c, q: Math.max(1, (cur.q || 1) + delta) };
+  const cur = orders[k] || { c:true, q:1, u:'ลัง' };
+  const next = { c:cur.c, q:Math.max(1,(cur.q||1)+delta), u:cur.u||'ลัง' };
   orders[k] = next;
-  const el = document.getElementById('qty-num-' + i);
+  const el = document.getElementById('qty-num-'+i);
   if (el) el.textContent = next.q;
   document.getElementById('countDisplay').textContent = countSelected();
   await saveOrder(k, next);
 }
 
+async function changeUnit(i, unit) {
+  const k = curKey(i);
+  const cur = orders[k] || { c:true, q:1, u:'ลัง' };
+  const next = { c:cur.c, q:cur.q||1, u:unit };
+  orders[k] = next;
+  await saveOrder(k, next);
+}
+
+// ─── Rename ─────────────────────────────────────
+function startRename(i) {
+  renamingKey = curKey(i);
+  render();
+  // focus the input after render
+  setTimeout(() => {
+    const inp = document.getElementById('rename-inp-'+i);
+    if (inp) { inp.focus(); inp.select(); }
+  }, 50);
+}
+
+async function commitRename(i, newName) {
+  const trimmed = newName.trim();
+  if (trimmed && trimmed !== catalog[currentShop][currentCat][i]) {
+    catalog[currentShop][currentCat][i] = trimmed;
+    saveCatalog();
+  }
+  renamingKey = null;
+  render();
+}
+
+// ─── Other edit actions ─────────────────────────
 async function clearAll() {
   if (!confirm('ล้างรายการที่เลือกทั้งหมดใน ' + currentShop + '?')) return;
   await clearOrders(currentShop + '||');
@@ -315,22 +308,21 @@ async function addCat() {
 async function deleteCat(cat) {
   if (!confirm('ลบหมวด "' + cat + '"?')) return;
   delete catalog[currentShop][cat];
-  const cats = getCats();
-  currentCat = cats[0] || '';
+  currentCat = getCats()[0] || '';
   saveCatalog();
   render();
 }
 
+// ─── Copy ───────────────────────────────────────
 function copyOrder() {
   const lines = ['สั่งของ ' + currentShop + '\n'];
-  const cats = Object.keys(catalog[currentShop] || {});
-  cats.forEach(cat => {
+  Object.keys(catalog[currentShop] || {}).forEach(cat => {
     const items = catalog[currentShop][cat] || [];
     const picked = [];
     items.forEach((name, i) => {
       const k = itemKey(currentShop, cat, i);
       if (orders[k] && orders[k].c) {
-        picked.push('- ' + name + '  x' + (orders[k].q || 1));
+        picked.push('- ' + name + '  ' + (orders[k].q||1) + ' ' + (orders[k].u||'ลัง'));
       }
     });
     if (picked.length) {
@@ -348,7 +340,7 @@ function copyOrder() {
 
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
-  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
   document.body.appendChild(ta); ta.focus(); ta.select();
   try { document.execCommand('copy'); showCopied(); } catch(e) { alert(text); }
   document.body.removeChild(ta);
@@ -361,9 +353,7 @@ function showCopied() {
   setTimeout(() => { btn.textContent = 'Copy รายการ → ส่ง Line'; btn.className = 'copy-btn'; }, 2500);
 }
 
-// ═══════════════════════════════════════
-//  Render
-// ═══════════════════════════════════════
+// ─── Render ─────────────────────────────────────
 function render() {
   if (!catalog) return;
 
@@ -372,18 +362,19 @@ function render() {
   shopTabsEl.innerHTML = '';
   DEFAULT_DATA.shops.forEach(s => {
     const btn = document.createElement('button');
-    btn.className = 'shop-tab' + (s === currentShop ? ' active' : '');
+    btn.className = 'shop-tab' + (s===currentShop?' active':'');
     btn.textContent = s;
     btn.addEventListener('click', () => {
       currentShop = s;
-      currentCat = Object.keys(catalog[s] || {})[0] || '';
+      currentCat = Object.keys(catalog[s]||{})[0]||'';
+      renamingKey = null;
       render();
     });
     shopTabsEl.appendChild(btn);
   });
 
   const cats = getCats();
-  if (!cats.includes(currentCat)) currentCat = cats[0] || '';
+  if (!cats.includes(currentCat)) currentCat = cats[0]||'';
 
   // Edit cat panel
   const editCatEl = document.getElementById('editCatPanel');
@@ -402,18 +393,15 @@ function render() {
       chip.className = 'cat-chip';
       chip.appendChild(document.createTextNode(c));
       const d = document.createElement('button');
-      d.className = 'del-cat-btn';
-      d.textContent = '×';
+      d.className = 'del-cat-btn'; d.textContent = '×';
       d.addEventListener('click', () => deleteCat(c));
-      chip.appendChild(d);
-      chips.appendChild(chip);
+      chip.appendChild(d); chips.appendChild(chip);
     });
     panel.appendChild(chips);
     const addRow = document.createElement('div');
     addRow.className = 'cat-add-row';
     const inp = document.createElement('input');
-    inp.id = 'newCat';
-    inp.placeholder = 'ชื่อหมวดใหม่ เช่น เครื่องดื่ม';
+    inp.id = 'newCat'; inp.placeholder = 'ชื่อหมวดใหม่';
     const btn = document.createElement('button');
     btn.textContent = '+ หมวด';
     btn.addEventListener('click', addCat);
@@ -427,9 +415,9 @@ function render() {
   catTabsEl.innerHTML = '';
   cats.forEach(c => {
     const btn = document.createElement('button');
-    btn.className = 'cat-tab' + (c === currentCat ? ' active' : '');
+    btn.className = 'cat-tab' + (c===currentCat?' active':'');
     btn.textContent = c;
-    btn.addEventListener('click', () => { currentCat = c; render(); });
+    btn.addEventListener('click', () => { currentCat = c; renamingKey = null; render(); });
     catTabsEl.appendChild(btn);
   });
 
@@ -442,8 +430,7 @@ function render() {
     const addRow = document.createElement('div');
     addRow.className = 'add-row';
     const inp = document.createElement('input');
-    inp.id = 'newItem';
-    inp.placeholder = 'ชื่อสินค้า เช่น Regency 70ml';
+    inp.id = 'newItem'; inp.placeholder = 'ชื่อสินค้า เช่น Regency 70ml';
     const btn = document.createElement('button');
     btn.textContent = '+ เพิ่ม';
     btn.addEventListener('click', addItem);
@@ -463,63 +450,128 @@ function render() {
     items.forEach((item, i) => {
       const on = isChecked(i);
       const qty = getQty(i);
+      const unit = getUnit(i);
+      const k = curKey(i);
+      const isRenaming = (renamingKey === k);
+
       const row = document.createElement('div');
-      row.className = 'item' + (on ? ' checked' : '');
+      row.className = 'item' + (on?' checked':'');
 
       if (!editMode) {
+        // ── Normal mode ──
         const chk = document.createElement('div');
         chk.className = 'chk';
         chk.textContent = on ? '✓' : '';
-        chk.addEventListener('click', () => toggleItem(i));
+        chk.addEventListener('click', () => { renamingKey = null; toggleItem(i); });
         row.appendChild(chk);
 
         const body = document.createElement('div');
         body.className = 'item-body';
-        body.addEventListener('click', () => toggleItem(i));
 
-        const nameEl = document.createElement('div');
-        nameEl.className = 'item-name';
-        nameEl.textContent = item;
-        body.appendChild(nameEl);
+        if (isRenaming) {
+          // Rename input
+          const inp = document.createElement('input');
+          inp.className = 'rename-input';
+          inp.id = 'rename-inp-'+i;
+          inp.value = item;
+          inp.addEventListener('click', e => e.stopPropagation());
+          inp.addEventListener('keydown', e => {
+            if (e.key === 'Enter') commitRename(i, inp.value);
+            if (e.key === 'Escape') { renamingKey = null; render(); }
+          });
+          inp.addEventListener('blur', () => commitRename(i, inp.value));
+          body.appendChild(inp);
+        } else {
+          // Name — tap to check/uncheck, long-press to rename
+          const nameEl = document.createElement('div');
+          nameEl.className = 'item-name';
+          nameEl.textContent = item;
 
-        if (on) {
+          let pressTimer = null;
+          nameEl.addEventListener('touchstart', () => {
+            pressTimer = setTimeout(() => { pressTimer = null; startRename(i); }, 600);
+          });
+          nameEl.addEventListener('touchend', () => {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; toggleItem(i); }
+          });
+          nameEl.addEventListener('touchmove', () => { if(pressTimer){clearTimeout(pressTimer);pressTimer=null;} });
+          // Mouse fallback for desktop
+          nameEl.addEventListener('mousedown', () => {
+            pressTimer = setTimeout(() => { pressTimer = null; startRename(i); }, 600);
+          });
+          nameEl.addEventListener('mouseup', () => {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; toggleItem(i); }
+          });
+
+          body.appendChild(nameEl);
+
+          // hint
+          const hint = document.createElement('div');
+          hint.className = 'rename-hint';
+          hint.textContent = 'กดค้างเพื่อแก้ชื่อ';
+          body.appendChild(hint);
+        }
+
+        // Qty + unit row (only when checked)
+        if (on && !isRenaming) {
           const qtyRow = document.createElement('div');
           qtyRow.className = 'qty-row';
+
           const lbl = document.createElement('span');
           lbl.className = 'qty-label';
           lbl.textContent = 'จำนวน:';
           qtyRow.appendChild(lbl);
+
           const stepper = document.createElement('div');
           stepper.className = 'qty-stepper';
           const minus = document.createElement('button');
-          minus.className = 'qty-btn';
-          minus.textContent = '−';
-          minus.addEventListener('click', e => { e.stopPropagation(); changeQty(i, -1); });
+          minus.className = 'qty-btn'; minus.textContent = '−';
+          minus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,-1); });
           const num = document.createElement('div');
-          num.className = 'qty-num';
-          num.id = 'qty-num-' + i;
-          num.textContent = qty;
+          num.className = 'qty-num'; num.id = 'qty-num-'+i; num.textContent = qty;
           const plus = document.createElement('button');
-          plus.className = 'qty-btn';
-          plus.textContent = '+';
-          plus.addEventListener('click', e => { e.stopPropagation(); changeQty(i, 1); });
+          plus.className = 'qty-btn'; plus.textContent = '+';
+          plus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,1); });
           stepper.appendChild(minus); stepper.appendChild(num); stepper.appendChild(plus);
           qtyRow.appendChild(stepper);
+
+          const sel = document.createElement('select');
+          sel.className = 'unit-select';
+          UNITS.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u; opt.textContent = u;
+            if (u === unit) opt.selected = true;
+            sel.appendChild(opt);
+          });
+          sel.addEventListener('click', e => e.stopPropagation());
+          sel.addEventListener('change', e => { e.stopPropagation(); changeUnit(i, e.target.value); });
+          qtyRow.appendChild(sel);
           body.appendChild(qtyRow);
         }
+
         row.appendChild(body);
+
       } else {
-        const nameEl = document.createElement('div');
-        nameEl.className = 'item-name';
-        nameEl.style.cssText = 'flex:1;padding-top:3px';
-        nameEl.textContent = item;
-        row.appendChild(nameEl);
+        // ── Edit mode ── show rename input inline + delete button
+        const nameInp = document.createElement('input');
+        nameInp.style.cssText = 'flex:1;font-size:15px;border:none;border-bottom:1px solid #c7c7cc;background:transparent;padding:2px 0;color:#1c1c1e;outline:none;min-width:0';
+        nameInp.value = item;
+        nameInp.addEventListener('change', e => {
+          const v = e.target.value.trim();
+          if (v && v !== catalog[currentShop][currentCat][i]) {
+            catalog[currentShop][currentCat][i] = v;
+            saveCatalog();
+          }
+        });
+        nameInp.addEventListener('click', e => e.stopPropagation());
+        row.appendChild(nameInp);
+
         const delBtn = document.createElement('button');
-        delBtn.className = 'del-btn';
-        delBtn.textContent = '×';
+        delBtn.className = 'del-btn'; delBtn.textContent = '×';
         delBtn.addEventListener('click', () => deleteItem(i));
         row.appendChild(delBtn);
       }
+
       itemListEl.appendChild(row);
     });
   }
@@ -527,11 +579,10 @@ function render() {
   document.getElementById('countDisplay').textContent = countSelected();
 }
 
-// ═══════════════════════════════════════
-//  Static listeners
-// ═══════════════════════════════════════
+// ─── Static listeners ───────────────────────────
 document.getElementById('editToggle').addEventListener('click', () => {
   editMode = !editMode;
+  renamingKey = null;
   const btn = document.getElementById('editToggle');
   btn.textContent = editMode ? 'เสร็จแล้ว' : 'แก้ไข';
   btn.className = 'edit-toggle' + (editMode ? ' on' : '');
@@ -540,9 +591,6 @@ document.getElementById('editToggle').addEventListener('click', () => {
 document.getElementById('clearBtn').addEventListener('click', clearAll);
 document.getElementById('copyBtn').addEventListener('click', copyOrder);
 
-// ═══════════════════════════════════════
-//  Boot
-// ═══════════════════════════════════════
 loadFromFirebase();
 </script>
 </body>
