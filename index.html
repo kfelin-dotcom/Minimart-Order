@@ -115,7 +115,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 const FB_URL = 'https://minimart--order-default-rtdb.firebaseio.com';
-const UNITS = ['ลัง','ขวด','แพ็ค','ชิ้น','ถาด','กล่อง','ห่อ','แผง','โหล','หมอน','กก','ปีบ'];
+const SHOP_UNITS = {'Supercheap': ['ลัง','ขวด','แพ็ค'], 'รวยสุรา': []};
+function getUnits() { return SHOP_UNITS[currentShop] || []; }
 
 const DEFAULT_DATA = {
   shops: ['Supercheap','รวยสุรา'],
@@ -535,17 +536,20 @@ function render() {
           stepper.appendChild(minus); stepper.appendChild(num); stepper.appendChild(plus);
           qtyRow.appendChild(stepper);
 
-          const sel = document.createElement('select');
-          sel.className = 'unit-select';
-          UNITS.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u; opt.textContent = u;
-            if (u === unit) opt.selected = true;
-            sel.appendChild(opt);
-          });
-          sel.addEventListener('click', e => e.stopPropagation());
-          sel.addEventListener('change', e => { e.stopPropagation(); changeUnit(i, e.target.value); });
-          qtyRow.appendChild(sel);
+          const units = getUnits();
+          if (units.length > 0) {
+            const sel = document.createElement('select');
+            sel.className = 'unit-select';
+            units.forEach(u => {
+              const opt = document.createElement('option');
+              opt.value = u; opt.textContent = u;
+              if (u === unit) opt.selected = true;
+              sel.appendChild(opt);
+            });
+            sel.addEventListener('click', e => e.stopPropagation());
+            sel.addEventListener('change', e => { e.stopPropagation(); changeUnit(i, e.target.value); });
+            qtyRow.appendChild(sel);
+          }
           body.appendChild(qtyRow);
         }
 
