@@ -316,26 +316,30 @@ async function deleteCat(cat) {
 
 // ─── Copy ───────────────────────────────────────
 function copyOrder() {
-  const lines = ['สั่งของ ' + currentShop + '\n'];
-  Object.keys(catalog[currentShop] || {}).forEach(cat => {
-    const items = catalog[currentShop][cat] || [];
-    const picked = [];
-    items.forEach((name, i) => {
-      const k = itemKey(currentShop, cat, i);
-      if (orders[k] && orders[k].c) {
-        picked.push('- ' + name + '  ' + (orders[k].q||1) + ' ' + (orders[k].u||'ลัง'));
+  const NO_QTY_CATS = ['บุหรี่'];
+  // Copy เฉพาะหมวดที่กำลังดูอยู่เท่านั้น
+  const items = (catalog[currentShop] || {})[currentCat] || [];
+  const picked = [];
+  items.forEach((name, i) => {
+    const k = itemKey(currentShop, currentCat, i);
+    if (orders[k] && orders[k].c) {
+      const noUnit = NO_QTY_CATS.includes(currentCat);
+      const units = getUnits();
+      if (units.length === 0 || noUnit) {
+        picked.push('* ' + name + '  # ' + (orders[k].q||1));
+      } else {
+        picked.push('* ' + name + '  # ' + (orders[k].q||1) + ' ' + (orders[k].u||'ลัง'));
       }
-    });
-    if (picked.length) {
-      lines.push('[' + cat + ']');
-      picked.forEach(p => lines.push(p));
-      lines.push('');
     }
   });
+  if (!picked.length) { alert('ยังไม่ได้เลือกรายการในหมวด ' + currentCat); return; }
+  const lines = [];
+  lines.push('[' + currentCat + ']');
+  lines.push('');
+  picked.forEach(p => lines.push(p));
   const text = lines.join('\n').trim();
-  if (!text.includes('- ')) { alert('ยังไม่ได้เลือกรายการ'); return; }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(showCopied).catch(() => fallbackCopy(text));
+    navigator.clipboard.writeText(text).then(() => showCopied()).catch(() => fallbackCopy(text));
   } else { fallbackCopy(text); }
 }
 
@@ -347,9 +351,12 @@ function fallbackCopy(text) {
   document.body.removeChild(ta);
 }
 
-function showCopied() {
+async function showCopied() {
+  // ล้างรายการที่ติ๊กทั้งหมดของร้านนี้หลัง copy
+  await clearOrders(currentShop + '||');
+  render();
   const btn = document.getElementById('copyBtn');
-  btn.textContent = 'คัดลอกแล้ว! วางใน Line ได้เลย';
+  btn.textContent = 'คัดลอกแล้ว! ✓ ล้างรายการแล้ว';
   btn.className = 'copy-btn ok';
   setTimeout(() => { btn.textContent = 'Copy รายการ → ส่ง Line'; btn.className = 'copy-btn'; }, 2500);
 }
@@ -515,42 +522,48 @@ function render() {
 
         // Qty + unit row (only when checked)
         if (on && !isRenaming) {
-          const qtyRow = document.createElement('div');
-          qtyRow.className = 'qty-row';
+          const NO_UNIT_CATS = ['บุหรี่'];
+          const noUnit = NO_UNIT_CATS.includes(currentCat);
+          if (true) {
+            const qtyRow = document.createElement('div');
+            qtyRow.className = 'qty-row';
 
-          const lbl = document.createElement('span');
-          lbl.className = 'qty-label';
-          lbl.textContent = 'จำนวน:';
-          qtyRow.appendChild(lbl);
+            const lbl = document.createElement('span');
+            lbl.className = 'qty-label';
+            lbl.textContent = 'จำนวน:';
+            qtyRow.appendChild(lbl);
 
-          const stepper = document.createElement('div');
-          stepper.className = 'qty-stepper';
-          const minus = document.createElement('button');
-          minus.className = 'qty-btn'; minus.textContent = '−';
-          minus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,-1); });
-          const num = document.createElement('div');
-          num.className = 'qty-num'; num.id = 'qty-num-'+i; num.textContent = qty;
-          const plus = document.createElement('button');
-          plus.className = 'qty-btn'; plus.textContent = '+';
-          plus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,1); });
-          stepper.appendChild(minus); stepper.appendChild(num); stepper.appendChild(plus);
-          qtyRow.appendChild(stepper);
+            const stepper = document.createElement('div');
+            stepper.className = 'qty-stepper';
+            const minus = document.createElement('button');
+            minus.className = 'qty-btn'; minus.textContent = '−';
+            minus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,-1); });
+            const num = document.createElement('div');
+            num.className = 'qty-num'; num.id = 'qty-num-'+i; num.textContent = qty;
+            const plus = document.createElement('button');
+            plus.className = 'qty-btn'; plus.textContent = '+';
+            plus.addEventListener('click', e => { e.stopPropagation(); changeQty(i,1); });
+            stepper.appendChild(minus); stepper.appendChild(num); stepper.appendChild(plus);
+            qtyRow.appendChild(stepper);
 
-          const units = getUnits();
-          if (units.length > 0) {
-            const sel = document.createElement('select');
-            sel.className = 'unit-select';
-            units.forEach(u => {
-              const opt = document.createElement('option');
-              opt.value = u; opt.textContent = u;
-              if (u === unit) opt.selected = true;
-              sel.appendChild(opt);
-            });
-            sel.addEventListener('click', e => e.stopPropagation());
-            sel.addEventListener('change', e => { e.stopPropagation(); changeUnit(i, e.target.value); });
-            qtyRow.appendChild(sel);
+            if (!noUnit) {
+              const units = getUnits();
+              if (units.length > 0) {
+                const sel = document.createElement('select');
+                sel.className = 'unit-select';
+                units.forEach(u => {
+                  const opt = document.createElement('option');
+                  opt.value = u; opt.textContent = u;
+                  if (u === unit) opt.selected = true;
+                  sel.appendChild(opt);
+                });
+                sel.addEventListener('click', e => e.stopPropagation());
+                sel.addEventListener('change', e => { e.stopPropagation(); changeUnit(i, e.target.value); });
+                qtyRow.appendChild(sel);
+              }
+            }
+            body.appendChild(qtyRow);
           }
-          body.appendChild(qtyRow);
         }
 
         row.appendChild(body);
